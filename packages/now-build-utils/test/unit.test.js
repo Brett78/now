@@ -49,50 +49,34 @@ it('should create zip files with symlinks properly', async () => {
   assert(aStat.isFile());
 });
 
-it('should only match supported node versions', () => {
-  expect(getSupportedNodeVersion('10.x')).resolves.toHaveProperty('major', 10);
-  expect(getSupportedNodeVersion('8.10.x')).resolves.toHaveProperty('major', 8);
+it('should only match supported node versions', async () => {
+  expect(await getSupportedNodeVersion('10.x')).toHaveProperty('major', 10);
+  expect(await getSupportedNodeVersion('8.10.x')).toHaveProperty('major', 8);
   expect(getSupportedNodeVersion('8.11.x')).rejects.toThrow();
   expect(getSupportedNodeVersion('6.x')).rejects.toThrow();
   expect(getSupportedNodeVersion('999.x')).rejects.toThrow();
   expect(getSupportedNodeVersion('foo')).rejects.toThrow();
-  expect(getSupportedNodeVersion('')).resolves.toBe(defaultSelection);
-  expect(getSupportedNodeVersion(null)).resolves.toBe(defaultSelection);
-  expect(getSupportedNodeVersion(undefined)).resolves.toBe(defaultSelection);
+  expect(await getSupportedNodeVersion('')).toBe(defaultSelection);
+  expect(await getSupportedNodeVersion(null)).toBe(defaultSelection);
+  expect(await getSupportedNodeVersion(undefined)).toBe(defaultSelection);
 });
 
-it('should match all semver ranges', () => {
+it('should match all semver ranges', async () => {
   // See https://docs.npmjs.com/files/package.json#engines
-  expect(getSupportedNodeVersion('10.0.0')).resolves.toHaveProperty(
+  expect(await getSupportedNodeVersion('10.0.0')).toHaveProperty('major', 10);
+  expect(await getSupportedNodeVersion('10.x')).toHaveProperty('major', 10);
+  expect(await getSupportedNodeVersion('>=10')).toHaveProperty('major', 12);
+  expect(await getSupportedNodeVersion('>=10.3.0')).toHaveProperty('major', 12);
+  expect(await getSupportedNodeVersion('8.5.0 - 10.5.0')).toHaveProperty(
     'major',
     10
   );
-  expect(getSupportedNodeVersion('10.x')).resolves.toHaveProperty('major', 10);
-  expect(getSupportedNodeVersion('>=10')).resolves.toHaveProperty('major', 10);
-  expect(getSupportedNodeVersion('>=10.3.0')).resolves.toHaveProperty(
+  expect(await getSupportedNodeVersion('>=9.5.0 <=10.5.0')).toHaveProperty(
     'major',
     10
   );
-  expect(getSupportedNodeVersion('8.5.0 - 10.5.0')).resolves.toHaveProperty(
-    'major',
-    10
-  );
-  expect(getSupportedNodeVersion('>=9.0.0')).resolves.toHaveProperty(
-    'major',
-    10
-  );
-  expect(getSupportedNodeVersion('>=9.5.0 <=10.5.0')).resolves.toHaveProperty(
-    'major',
-    10
-  );
-  expect(getSupportedNodeVersion('~10.5.0')).resolves.toHaveProperty(
-    'major',
-    10
-  );
-  expect(getSupportedNodeVersion('^10.5.0')).resolves.toHaveProperty(
-    'major',
-    10
-  );
+  expect(await getSupportedNodeVersion('~10.5.0')).toHaveProperty('major', 10);
+  expect(await getSupportedNodeVersion('^10.5.0')).toHaveProperty('major', 10);
 });
 
 it('should support require by path for legacy builders', () => {
@@ -300,6 +284,19 @@ describe('Test `detectBuilders`', () => {
 
     const { builders } = await detectBuilders(files, pkg);
     expect(builders[0].use).toBe('@now/static-build');
+    expect(builders[0].src).toBe('package.json');
+    expect(builders.length).toBe(1);
+  });
+
+  it('nuxt + tag canary', async () => {
+    const pkg = {
+      scripts: { build: 'nuxt build' },
+      dependencies: { nuxt: '2.8.1' },
+    };
+    const files = ['package.json', 'pages/index.js'];
+
+    const { builders } = await detectBuilders(files, pkg, { tag: 'canary' });
+    expect(builders[0].use).toBe('@now/static-build@canary');
     expect(builders[0].src).toBe('package.json');
     expect(builders.length).toBe(1);
   });
@@ -637,11 +634,13 @@ describe('Test `detectBuilders`', () => {
 
   it('Must include includeFiles config property', async () => {
     const functions = {
-      'api/test.js': { includeFiles: 'text/include.txt' }
-    }
+      'api/test.js': { includeFiles: 'text/include.txt' },
+    };
     const files = ['api/test.js'];
 
-    const { builders, errors } = await detectBuilders(files, null, { functions });
+    const { builders, errors } = await detectBuilders(files, null, {
+      functions,
+    });
 
     expect(errors).toBe(null);
     expect(builders).not.toBe(null);
@@ -649,35 +648,19 @@ describe('Test `detectBuilders`', () => {
     expect(builders[0].config).toMatchObject({
       functions,
       zeroConfig: true,
-      includeFiles: 'text/include.txt'
+      includeFiles: 'text/include.txt',
     });
   });
 
   it('Must include excludeFiles config property', async () => {
     const functions = {
-      'api/test.js': { excludeFiles: 'text/exclude.txt' }
-    }
+      'api/test.js': { excludeFiles: 'text/exclude.txt' },
+    };
     const files = ['api/test.js'];
 
-    const { builders, errors } = await detectBuilders(files, null, { functions });
-
-    expect(errors).toBe(null);
-    expect(builders).not.toBe(null);
-    expect(builders[0].use).toBe('@now/node');
-    expect(builders[0].config).toMatchObject({
+    const { builders, errors } = await detectBuilders(files, null, {
       functions,
-      zeroConfig: true,
-      excludeFiles: 'text/exclude.txt'
     });
-  });
-
-  it('Must include excludeFiles and includeFiles config property', async () => {
-    const functions = {
-      'api/test.js': { excludeFiles: 'text/exclude.txt', includeFiles: 'text/include.txt' }
-    }
-    const files = ['api/test.js'];
-
-    const { builders, errors } = await detectBuilders(files, null, { functions });
 
     expect(errors).toBe(null);
     expect(builders).not.toBe(null);
@@ -686,14 +669,37 @@ describe('Test `detectBuilders`', () => {
       functions,
       zeroConfig: true,
       excludeFiles: 'text/exclude.txt',
-      includeFiles: 'text/include.txt'
+    });
+  });
+
+  it('Must include excludeFiles and includeFiles config property', async () => {
+    const functions = {
+      'api/test.js': {
+        excludeFiles: 'text/exclude.txt',
+        includeFiles: 'text/include.txt',
+      },
+    };
+    const files = ['api/test.js'];
+
+    const { builders, errors } = await detectBuilders(files, null, {
+      functions,
+    });
+
+    expect(errors).toBe(null);
+    expect(builders).not.toBe(null);
+    expect(builders[0].use).toBe('@now/node');
+    expect(builders[0].config).toMatchObject({
+      functions,
+      zeroConfig: true,
+      excludeFiles: 'text/exclude.txt',
+      includeFiles: 'text/include.txt',
     });
   });
 
   it('Must fail for includeFiles config property', async () => {
     const functions = {
-      'api/test.js': { includeFiles: { test: 1 } }
-    }
+      'api/test.js': { includeFiles: { test: 1 } },
+    };
     const files = ['api/test.js'];
 
     const { errors } = await detectBuilders(files, null, { functions });
@@ -704,14 +710,26 @@ describe('Test `detectBuilders`', () => {
 
   it('Must fail for excludeFiles config property', async () => {
     const functions = {
-      'api/test.js': { excludeFiles: { test: 1 } }
-    }
+      'api/test.js': { excludeFiles: { test: 1 } },
+    };
     const files = ['api/test.js'];
 
     const { errors } = await detectBuilders(files, null, { functions });
 
     expect(errors).not.toBe(null);
     expect(errors[0].code).toBe('invalid_function_property');
+  });
+
+  it('Must fail when function patterns start with a slash', async () => {
+    const functions = {
+      '/api/test.js': { memory: 128 },
+    };
+    const files = ['api/test.js', '/api/test.js'];
+
+    const { errors } = await detectBuilders(files, null, { functions });
+
+    expect(errors).not.toBe(null);
+    expect(errors[0].code).toBe('invalid_function_source');
   });
 });
 

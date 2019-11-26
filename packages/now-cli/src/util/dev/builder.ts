@@ -32,6 +32,7 @@ import {
   BuilderOutputs,
 } from './types';
 import { normalizeRoutes } from '@now/routing-utils';
+import getUpdateCommand from '../get-update-command';
 
 interface BuildMessage {
   type: string;
@@ -267,7 +268,11 @@ export async function executeBuild(
       },
     } as BuildResult;
   } else {
-    result = buildResultOrOutputs as BuildResult;
+    throw new Error(
+      `Now CLI does not support builder version ${
+        builder.version
+      }.\nPlease run \`${await getUpdateCommand()}\` to update Now CLI.`
+    );
   }
 
   // Normalize Builder Routes

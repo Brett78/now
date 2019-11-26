@@ -377,6 +377,28 @@ describe('normalizeRoutes', () => {
     );
   });
 
+  test('fails if check is not boolean', () => {
+    assertError(
+      [
+        // @ts-ignore
+        {
+          check: 'false',
+        },
+      ],
+      [
+        {
+          dataPath: '[0].check',
+          keyword: 'type',
+          message: 'should be boolean',
+          params: {
+            type: 'boolean',
+          },
+          schemaPath: '#/items/properties/check/type',
+        },
+      ]
+    );
+  });
+
   test('fails if status is not number', () => {
     assertError(
       [
@@ -425,8 +447,7 @@ describe('normalizeRoutes', () => {
 describe('getTransformedRoutes', () => {
   test('should normalize nowConfig.routes', () => {
     const nowConfig = { routes: [{ src: '/page', dest: '/page.html' }] };
-    const filePaths = [];
-    const actual = getTransformedRoutes({ nowConfig, filePaths });
+    const actual = getTransformedRoutes({ nowConfig });
     const expected = normalizeRoutes(nowConfig.routes);
     assert.deepEqual(actual, expected);
     assertValid(actual.routes);
@@ -434,8 +455,7 @@ describe('getTransformedRoutes', () => {
 
   test('should not error when routes is null and cleanUrls is true', () => {
     const nowConfig = { cleanUrls: true, routes: null };
-    const filePaths = ['file.html'];
-    const actual = getTransformedRoutes({ nowConfig, filePaths });
+    const actual = getTransformedRoutes({ nowConfig });
     assert.equal(actual.error, null);
     assertValid(actual.routes);
   });
@@ -445,8 +465,7 @@ describe('getTransformedRoutes', () => {
       cleanUrls: true,
       routes: [{ src: '/page', dest: '/file.html' }],
     };
-    const filePaths = ['file.html'];
-    const actual = getTransformedRoutes({ nowConfig, filePaths });
+    const actual = getTransformedRoutes({ nowConfig });
     assert.notEqual(actual.error, null);
     assert.equal(actual.error.code, 'invalid_keys');
   });
@@ -477,8 +496,7 @@ describe('getTransformedRoutes', () => {
         { source: '/help', destination: '/support', statusCode: 302 },
       ],
     };
-    const filePaths = ['/index.html', '/support.html', '/v2/api.py'];
-    const actual = getTransformedRoutes({ nowConfig, filePaths });
+    const actual = getTransformedRoutes({ nowConfig });
     const expected = [
       {
         src: '^/(?:(.+)/)?index(?:\\.html)?/?$',
@@ -496,7 +514,7 @@ describe('getTransformedRoutes', () => {
         status: 302,
       },
       { handle: 'filesystem' },
-      { src: '^/v1$', dest: '/v2/api.py', continue: true },
+      { src: '^/v1$', dest: '/v2/api.py', check: true },
     ];
     assert.deepEqual(actual.error, null);
     assert.deepEqual(actual.routes, expected);

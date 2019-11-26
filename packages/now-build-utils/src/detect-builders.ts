@@ -96,6 +96,8 @@ async function detectFrontBuilder(
   builders: Builder[],
   options: Options
 ): Promise<Builder> {
+  const { tag } = options;
+  const withTag = tag ? `@${tag}` : '';
   for (const [dependency, builder] of getBuilders(options)) {
     const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies);
 
@@ -121,7 +123,7 @@ async function detectFrontBuilder(
   }
 
   // By default we'll choose the `static-build` builder
-  return { src, use: '@now/static-build', config };
+  return { src, use: `@now/static-build${withTag}`, config };
 }
 
 // Files that match a specific pattern will get ignored
@@ -286,6 +288,13 @@ function validateFunctions(files: string[], { functions = {} }: Options) {
       };
     }
 
+    if (path.startsWith('/')) {
+      return {
+        code: 'invalid_function_source',
+        message: `The function path "${path}" is invalid. The path must be relative to your project root and therefore cannot start with a slash.`,
+      };
+    }
+
     if (files.some(f => f === path || minimatch(f, path)) === false) {
       return {
         code: 'invalid_function_source',
@@ -318,7 +327,7 @@ function validateFunctions(files: string[], { functions = {} }: Options) {
       if (typeof func.includeFiles !== 'string') {
         return {
           code: 'invalid_function_property',
-          message: `The property \`includeFiles\` must be a string.`
+          message: `The property \`includeFiles\` must be a string.`,
         };
       }
     }
@@ -327,7 +336,7 @@ function validateFunctions(files: string[], { functions = {} }: Options) {
       if (typeof func.excludeFiles !== 'string') {
         return {
           code: 'invalid_function_property',
-          message: `The property \`excludeFiles\` must be a string.`
+          message: `The property \`excludeFiles\` must be a string.`,
         };
       }
     }

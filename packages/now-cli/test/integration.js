@@ -213,12 +213,12 @@ test('login', async t => {
 
 test('deploy using --local-config flag v2', async t => {
   const target = fixture('local-config-v2');
+  const configPath = path.join(target, 'now-test.json');
 
   const { exitCode, stderr, stdout } = await execa(
     binaryPath,
-    ['deploy', '--local-config', 'now-test.json', ...defaultArgs],
+    ['deploy', target, '--local-config', configPath, ...defaultArgs],
     {
-      cwd: target,
       reject: false,
     }
   );
@@ -226,6 +226,7 @@ test('deploy using --local-config flag v2', async t => {
   t.is(exitCode, 0, formatOutput({ stderr, stdout }));
 
   const { host } = new URL(stdout);
+  t.regex(host, /secondary/gm, `Expected "secondary" but received "${host}"`);
 
   const testRes = await fetch(`https://${host}/test-${contextName}.html`);
   const testText = await testRes.text();
@@ -240,6 +241,34 @@ test('deploy using --local-config flag v2', async t => {
 
   const anotherMainRes = await fetch(`https://${host}/another-main`);
   t.is(anotherMainRes.status, 404, 'Should not deploy/build main now.json');
+});
+
+test('deploy using --local-config flag above target', async t => {
+  const root = fixture('local-config-above-target');
+  const target = path.join(root, 'dir');
+
+  const { exitCode, stderr, stdout } = await execa(
+    binaryPath,
+    ['deploy', target, '--local-config', './now-root.json', ...defaultArgs],
+    {
+      cwd: root,
+      reject: false,
+    }
+  );
+
+  t.is(exitCode, 0, formatOutput({ stderr, stdout }));
+
+  const { host } = new URL(stdout);
+
+  const testRes = await fetch(`https://${host}/index.html`);
+  const testText = await testRes.text();
+  t.is(testText, '<h1>hello index</h1>');
+
+  const anotherTestRes = await fetch(`https://${host}/another.html`);
+  const anotherTestText = await anotherTestRes.text();
+  t.is(anotherTestText, '<h1>hello another</h1>');
+
+  t.regex(host, /root-level/gm, `Expected "root-level" but received "${host}"`);
 });
 
 test('print the deploy help message', async t => {
@@ -2003,7 +2032,18 @@ test('fail to deploy a Lambda with an incorrect value for maxDuration', async t 
   );
 });
 
-// We need to skip those tests until `now-php` supports Runtime version 3
+test('invalid `--token`', async t => {
+  const output = await execute(['--token', 'he\nl,o.']);
+
+  t.is(output.exitCode, 1, formatOutput(output));
+  t.true(
+    output.stderr.includes(
+      'Error! You defined "--token", but its contents are invalid. Must not contain: "\\n", ",", "."'
+    )
+  );
+});
+
+// We need to skip this test until `now-php` supports Runtime version 3
 test('deploy a Lambda with a specific runtime', async t => {
   const directory = fixture('lambda-with-php-runtime');
   const output = await execute([directory, '--public']);
@@ -2016,7 +2056,7 @@ test('deploy a Lambda with a specific runtime', async t => {
   t.is(build.use, 'now-php@0.0.7', JSON.stringify(build, null, 2));
 });
 
-// We need to skip those tests until `now-php` supports Runtime version 3
+// We need to skip this test until `now-php` supports Runtime version 3
 test('fail to deploy a Lambda with a specific runtime but without a locked version', async t => {
   const directory = fixture('lambda-with-invalid-runtime');
   const output = await execute([directory]);
